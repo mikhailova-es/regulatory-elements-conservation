@@ -7,6 +7,16 @@ panaroo_file = 'data/E_coli/orthologous_groups/gene_presence_absence.csv'
 annotation_dir = 'intermediate_data/E_coli/ortho_annotation/'
 igr_dir = 'intermediate_data/E_coli/intergenic_regions/'
 
+# Create output directories
+
+for folder in [
+    'ortologs_sinvergons-',
+    'ortologs_sinvergons+',
+    'ortologs_divergons',
+    'ortologs_convergons'
+]:
+    os.makedirs(os.path.join(igr_dir, folder), exist_ok=True)
+    
 # Find GFF annotation files for all genomes
 spis = os.listdir(genomes_dir)
 annotation_files = []
