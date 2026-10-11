@@ -9,7 +9,8 @@ sin_minus_dir = 'intermediate_data/B_subtilis/intergenic_regions/ortologs_sinver
 sin_plus_dir = 'intermediate_data/B_subtilis/intergenic_regions/ortologs_sinvergons+/'
 divergent_dir = 'intermediate_data/B_subtilis/intergenic_regions/ortologs_divergons/'
 convergent_dir = 'intermediate_data/B_subtilis/intergenic_regions/ortologs_convergons/'
-
+for directory in [sin_minus_dir, sin_plus_dir, divergent_dir, convergent_dir]:
+    os.makedirs(directory, exist_ok=True)
 desired_types = {'CDS', 'tRNA', 'rRNA', 'tmRNA', 'RNase_P_RNA', 'SRP_RNA', 'pseudogene'}
 
 
