@@ -11,7 +11,11 @@ divergent_dir = 'intermediate_data/B_subtilis/intergenic_regions/ortologs_diverg
 convergent_dir = 'intermediate_data/B_subtilis/intergenic_regions/ortologs_convergons/'
 folder_paths = [sin_minus_dir, sin_plus_dir, divergent_dir, convergent_dir]
 filter_folder_paths = [path + '_filter/' for path in folder_paths]
-
+align_folder_paths = [path + '_align/' for path in folder_paths]
+# Create output directories
+for directory in filter_folder_paths + align_folder_paths:
+    os.makedirs(directory, exist_ok=True)
+    
 mafft_path = '/path/to/mafft'
 
 # Filter sequences by length and ambiguous nucleotides
