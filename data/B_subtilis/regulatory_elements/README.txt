@@ -1,1 +1,11 @@
-promoters.csv - 
+- `promoters.csv` — promoter annotations
+- `promoters_cord.fna` — promoter sequences 
+- `rnas.fna` — RNA sequences 
+- `rnas.tsv` — RNA annotations
+- `rnas_dot.txt` — RNA secondary structures in dot-bracket notation
+- `terminators.fna` — terminator sequences 
+- `terminators.tsv` — terminator annotations
+- `terminators_cord.txt` — coordinates of structure regions within terminators
+- `terminators_dot.txt` — terminator secondary structures in dot-bracket notation
+- `tf-factors.fna` — transcription factor binding site sequences 
+- `tf-factors.tsv` — transcription factor binding site annotations 
