@@ -1,1 +1,1 @@
-Folder for file with orthologous groups
+Folder for the orthologous groups file.
