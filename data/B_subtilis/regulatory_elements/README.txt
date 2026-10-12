@@ -1,4 +1,4 @@
-- `promoters.csv` — promoter annotations
+- `promoters.tsv` — promoter annotations
 - `promoters_cord.fna` — promoter sequences 
 - `rnas.fna` — RNA sequences 
 - `rnas.tsv` — RNA annotations
