@@ -1,1 +1,1920 @@
+---
+title: "figures"
+output: html_document
+date: "2026-09-28"
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(patchwork)
+library(magick)
+library(ggpubr)
+```
+
+## R Markdown
+
+
+Polymorphism fractions within transcription factor binding sites and their flanking regions in E. coli (Figure 1a) 
+```{r}
+# Polymorphism threshold and input/output files
+
+tf_factors_ecoli <- read.delim("results/E_coli/tf_1.tsv", row.names = NULL)
+
+# Calculate mean polymorphism in the two flanks and exclude low-confidence sites
+tf_factors_ecoli <- tf_factors_ecoli %>%
+  mutate(out_site = (right_site + left_site) / 2) %>%
+  filter(confidenceLevel != "W")
+
+# Classify points relative to the neutral zone around y = x
+tf_factors_ecoli <- tf_factors_ecoli %>%
+  mutate(real_d = (out_site - in_site) / sqrt(2),
+         zone = case_when(
+           real_d >= sd_low & real_d <= sd_up ~ "within neutral zone",
+           real_d > sd_up ~ "above y=x",
+           real_d < sd_low ~ "below y=x"
+         ))
+
+tf_factors_ecoli %>% count(zone)
+
+# Highlight selected transcription factors
+tf_factors_ecoli <- tf_factors_ecoli %>%
+  mutate(color_group = ifelse(
+    regulatorName %in% c("ArcA", "CRP", "Fis", "Fur", "H-NS", "Lrp", "Nac"),
+    regulatorName,
+    "Other"
+  ))
+
+# Calculate the boundaries of the neutral zone
+tf_factors_ecoli <- tf_factors_ecoli %>%
+  mutate(lower_x = mean_x - sd_low / sqrt(2),
+         lower_y = mean_y + sd_low / sqrt(2),
+         upper_x = mean_x - sd_up / sqrt(2),
+         upper_y = mean_y + sd_up / sqrt(2))
+
+tf_factors_ecoli_sorted <- tf_factors_ecoli %>% arrange(mean_x)
+
+polygon_data <- bind_rows(
+  tf_factors_ecoli_sorted %>% transmute(x = lower_x, y = lower_y),
+  tf_factors_ecoli_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+# Plot polymorphism inside and outside TF binding sites
+tf_factors_plot_ecoli <- ggplot() +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  geom_jitter(data = tf_factors_ecoli, aes(x = in_site, y = out_site, color = color_group),
+              width = 0.0005, height = 0.0005, alpha = 0.8, size = 1.5) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065", linewidth = 1) +
+  labs(x = "Fraction of polymorphic positions in the TF site",
+       y = "Fraction of polymorphic positions in flanking regions",
+       title = expression(italic(E.~coli))) +
+  scale_color_manual(name = "TF",
+                     values = c("ArcA" = "#3498db", "CRP" = "#38b000", "Fis" = "darkblue",
+                                "Fur" = "red", "H-NS" = "#393a41", "Lrp" = "#ac11ff",
+                                "Nac" = "#f15bb5", "Other" = "orange"),
+                     breaks = c("ArcA", "CRP", "Fis", "Fur", "H-NS", "Lrp", "Nac", "Other")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  plot.margin = margin(5, 5, 5, 5),
+  aspect.ratio = 1
+  ) 
+
+tf_factors_plot_ecoli
+```
+
+Test the proportion of E. coli TFBSs above the neutral zone (Table 1)
+```{r}
+res <- binom.test(
+  x = 471,
+  n = 471 + 167,
+  p = 0.5,
+  alternative = "two.sided"
+)
+
+cat("Proportion:", round(471 / 638 * 100, 1), "%\n")
+cat("P-value:", res$p.value, "\n")
+```
+
+ Mean polymorphism fractions within and outside binding sites of the same transcription factors in E. coli (Figure 1c)
+
+```{r}
+# Read factor-level polymorphism data
+tf_factors_ecoli <- read.delim("results/E_coli/tf_mean.tsv", row.names = NULL)
+
+# Classify factors relative to the neutral zone around y = x
+tf_factors_ecoli <- tf_factors_ecoli %>%
+  mutate(real_d = (mean_out_site - mean_in_site) / sqrt(2),
+         zone = case_when(
+           real_d >= sd_low & real_d <= sd_up ~ "within neutral zone",
+           real_d > sd_up ~ "above y=x",
+           real_d < sd_low ~ "below y=x"
+         ))
+
+tf_factors_ecoli %>% count(zone)
+
+# Highlight selected transcription factors
+tf_factors_ecoli <- tf_factors_ecoli %>%
+  mutate(color_group = ifelse(
+    name %in% c("ArcA", "CRP", "Fis", "Fur", "H-NS", "Lrp", "Nac"),
+    name,
+    "Other"
+  ))
+
+# Calculate the boundaries of the neutral zone
+tf_factors_ecoli <- tf_factors_ecoli %>%
+  mutate(lower_x = mean_x - sd_low / sqrt(2),
+         lower_y = mean_y + sd_low / sqrt(2),
+         upper_x = mean_x - sd_up / sqrt(2),
+         upper_y = mean_y + sd_up / sqrt(2))
+
+tf_factors_ecoli_sorted <- tf_factors_ecoli %>% arrange(mean_x)
+
+polygon_data <- bind_rows(
+  tf_factors_ecoli_sorted %>% transmute(x = lower_x, y = lower_y),
+  tf_factors_ecoli_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+# Plot mean polymorphism inside and outside TF binding sites
+tf_factors_plot_ecoli_mean <- ggplot() +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  geom_jitter(data = tf_factors_ecoli, aes(x = mean_in_site, y = mean_out_site, color = color_group),
+              width = 0.0005, height = 0.0005, alpha = 0.8, size = 1.5) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065", linewidth = 1) +
+  labs(x = "Mean fraction of polymorphic positions in TF sites",
+       y = "Mean fraction of polymorphic positions in flanking regions") +
+  scale_color_manual(name = "TF",
+                     values = c("ArcA" = "#3498db", "CRP" = "#38b000", "Fis" = "darkblue",
+                                "Fur" = "red", "H-NS" = "#393a41", "Lrp" = "#ac11ff",
+                                "Nac" = "#f15bb5", "Other" = "orange"),
+                     breaks = c("ArcA", "CRP", "Fis", "Fur", "H-NS", "Lrp", "Nac", "Other")) +
+  theme_minimal() +
+    theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  plot.margin = margin(5, 5, 5, 5),
+  aspect.ratio = 1
+)
+
+tf_factors_plot_ecoli_mean
+```
+
+Test the proportion of TFs with mean values above the neutral zone (Table 1)
+
+```{r}
+res <- binom.test(
+  x = 95,
+  n = 109 ,
+  p = 0.5,
+  alternative = "two.sided"
+)
+
+
+cat("Proportion:", round(95 / 109 * 100, 1), "%\n")
+cat("P-value:", res$p.value, "\n")
+```
+
+Histograms of the log2 ratio between the mean polymorphism fraction within the binding sites and that in their flanking regions for each E. coli transcription factor (Figure 1e)
+```{r}
+# Calculate the within-site to outside-site polymorphism ratio
+tf_factors_conserv_ecoli <- tf_factors_ecoli %>% mutate(out_site = mean_out_site + 0.001, in_site = mean_in_site + 0.001) %>% mutate(conserv = in_site / out_site)
+tf_factors_conserv_ecoli <- tf_factors_conserv_ecoli[order(tf_factors_conserv_ecoli$conserv),]
+
+tf_factors_conserv_ecoli$name <- factor(tf_factors_conserv_ecoli$name, levels = tf_factors_conserv_ecoli$name)
+
+
+# Plot log2 within-site to outside-site polymorphism ratios
+tf_factors_hist_ecoli <- ggplot(tf_factors_conserv_ecoli %>% mutate(log_conserv = ifelse(conserv >= 0.94 & conserv <= 1.02, -0.01, log2(conserv))), aes(x = name, y = log_conserv)) +
+  geom_bar(stat = "identity", fill = "#FFBA00", width = 0.4) +
+  theme_minimal() +
+  labs(x = expression(italic(E.~coli)), y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6.5),
+        axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12),
+        axis.title = element_text(size = 13),
+        plot.title = element_text(size = 14)) +
+  scale_y_continuous(breaks = c(8, 6, 4, 2, 0, -2, -4, -6, -8), minor_breaks = NULL, limits = c(-9, 8))
+
+tf_factors_hist_ecoli
+```
+
+Calculate median conservation across all E. coli TFs and for TFs outside the neutral zone
+```{r}
+cat("Median log2 conservation across all TFs:", median(log2(tf_factors_conserv_ecoli$conserv), na.rm = TRUE), "\n")
+cat("Median log2 conservation for TFs outside the neutral zone:", tf_factors_conserv_ecoli%>% filter(zone != "within neutral zone") %>%
+    summarise(median_conserv = median(log2(conserv), na.rm = TRUE)) %>% pull(median_conserv),"\n")
+```
+
+Polymorphism fractions within transcription factor binding sites and their flanking regions in B. subtilis (Figure 1b)
+
+```{r}
+tf_factors_bac_all <- read.delim("results/B_subtilis/tf_all.tsv", row.names = NULL) %>% mutate(out_site = (right_site + left_site) / 2)
+
+# Classify TFBSs relative to the neutral zone
+tf_factors_bac_all <- tf_factors_bac_all %>%
+  mutate(real_d = (out_site - in_site) / sqrt(2),
+         zone = case_when(
+           real_d >= sd_low & real_d <= sd_up ~ "Within neutral zone",
+           real_d > sd_up ~ "Above neutral zone",
+           real_d < sd_low ~ "Below neutral zone"
+         ))
+
+tf_factors_bac_all %>% count(zone)
+
+# Highlight selected transcription factors
+tf_factors_bac_all <- tf_factors_bac_all %>%
+  mutate(color_group = ifelse(regulatorName %in% c("CcpA", "Fur", "LexA", "PerR", "PurR", "Spo0A", "Hpr"),
+                              regulatorName, "Other"))
+
+# Calculate the boundaries of the neutral zone
+tf_factors_bac_all <- tf_factors_bac_all %>%
+  mutate(
+    lower_x = mean_x - sd_low / sqrt(2),
+    lower_y = mean_y + sd_low / sqrt(2),
+    upper_x = mean_x - sd_up / sqrt(2),
+    upper_y = mean_y + sd_up / sqrt(2)
+  )
+
+tf_factors_bac_all_sorted <- tf_factors_bac_all %>% arrange(mean_x)
+
+polygon_data <- bind_rows(
+  tf_factors_bac_all_sorted %>% transmute(x = lower_x, y = lower_y),
+  tf_factors_bac_all_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+# Plot polymorphism inside and outside TF binding sites
+
+tf_factors_bac_all_plot <- ggplot() +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  geom_jitter(data = tf_factors_bac_all, aes(x = in_site, y = out_site, color = color_group),
+              width = 0.001, height = 0.001, alpha = 0.8, size = 1.5) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065", linewidth = 1) +
+  labs(
+    x = "Fraction of polymorphic positions in the TF site",
+    y = "Fraction of polymorphic positions in flanking regions",
+    title = expression(italic(B.~subtilis))
+  ) +
+  scale_color_manual(
+    name = "TF",
+    values = c("CcpA" = "#3498db", "Fur" = "red", "LexA" = "darkblue", "PerR" = "#393a41",
+               "PurR" = "#38b000", "Spo0A" = "#ac11ff", "Hpr" = "#f15bb5", "Other" = "#FF8C00"),
+    breaks = c("CcpA", "Fur", "LexA", "PerR", "PurR", "Spo0A", "Hpr", "Other")
+  ) +
+  theme_minimal() +
+    theme(
+    plot.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  plot.margin = margin(5, 5, 5, 5),
+  aspect.ratio = 1
+)
+
+tf_factors_bac_all_plot
+```
+
+Test the proportion of B. subtilis TFBSs above the neutral zone (Table 1)
+
+```{r}
+res <- binom.test(
+  x = 70,
+  n = 83,
+  p = 0.5,
+  alternative = "two.sided"
+)
+
+cat("Proportion:", round(70 / 83 * 100, 1), "%\n")
+cat("P-value:", res$p.value, "\n")
+```
+
+Mean polymorphism fractions within and outside binding sites of the same B. subtilis transcription factors (Figure 1d)
+
+```{r}
+tf_factors_bac <- read.delim("results/B_subtilis/tf_mean.tsv", row.names = NULL)
+
+# Classify TFs relative to the neutral zone
+tf_factors_bac <- tf_factors_bac %>%
+  mutate(real_d = (mean_out_site - mean_in_site) / sqrt(2),
+         zone = case_when(
+           real_d >= sd_low & real_d <= sd_up ~ "Within neutral zone",
+           real_d > sd_up ~ "Above neutral zone",
+           real_d < sd_low ~ "Below neutral zone"
+         ))
+
+tf_factors_bac %>% count(zone)
+
+# Highlight selected transcription factors
+tf_factors_bac <- tf_factors_bac %>%
+  mutate(color_group = ifelse(name %in% c("CcpA", "Fur", "LexA", "PerR", "PurR", "Spo0A", "Hpr"),
+                              name, "Other"))
+
+# Calculate the boundaries of the neutral zone
+tf_factors_bac <- tf_factors_bac %>%
+  mutate(
+    lower_x = mean_x - sd_low / sqrt(2),
+    lower_y = mean_y + sd_low / sqrt(2),
+    upper_x = mean_x - sd_up / sqrt(2),
+    upper_y = mean_y + sd_up / sqrt(2)
+  )
+
+tf_factors_bac_sorted <- tf_factors_bac %>% arrange(mean_x)
+
+polygon_data <- bind_rows(
+  tf_factors_bac_sorted %>% transmute(x = lower_x, y = lower_y),
+  tf_factors_bac_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+# Plot polymorphism inside and outside TF binding sites
+tf_factors_bac_plot <- ggplot() +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  geom_jitter(data = tf_factors_bac, aes(x = mean_in_site, y = mean_out_site, color = color_group),
+              width = 0.001, height = 0.001, alpha = 0.8, size = 1.5) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065", linewidth = 1) +
+  labs(
+    x = "Mean fraction of polymorphic positions in TF sites",
+    y = "Mean fraction of polymorphic positions in flanking regions"
+  ) +
+  scale_color_manual(
+    name = "TF",
+    values = c("CcpA" = "#3498db", "Fur" = "red", "LexA" = "darkblue", "PerR" = "#393a41",
+               "PurR" = "#38b000", "Spo0A" = "#ac11ff", "Hpr" = "#f15bb5", "Other" = "#FF8C00"),
+    breaks = c("CcpA", "Fur", "LexA", "PerR", "PurR", "Spo0A", "Hpr", "Other")
+  ) +
+  theme_minimal() +
+    theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  plot.margin = margin(5, 5, 5, 5),
+  aspect.ratio = 1
+)
+
+tf_factors_bac_plot
+
+```
+
+Test the proportion of B, subtilis TFs with mean values above the neutral zone (Table 1)
+```{r}
+res <- binom.test(
+  x = 23,
+  n = 27,
+  p = 0.5,
+  alternative = "two.sided"
+)
+
+cat("Proportion:", round(23 / 27 * 100, 1), "%\n")
+cat("P-value:", res$p.value, "\n")
+```
+
+Histograms of the log2 ratio between the mean polymorphism fraction within the B. subtilis binding sites and that in their flanking regions for each transcription factor (Figure 1f)
+```{r}
+# Calculate the within-site to outside-site polymorphism ratio
+tf_conserv_bac <- tf_factors_bac %>%
+  mutate(out_site = mean_out_site + 0.001, in_site = mean_in_site + 0.001) %>%
+  mutate(conserv = in_site / out_site)
+
+tf_conserv_bac <- tf_conserv_bac[order(tf_conserv_bac$conserv), ]
+tf_conserv_bac$name <- factor(tf_conserv_bac$name, levels = tf_conserv_bac$name)
+
+# Plot log2 within-site to outside-site polymorphism ratios
+tf_gist_bac <- ggplot(tf_conserv_bac %>% mutate(log_conserv = ifelse(conserv == 1, -0.02, log2(conserv))),
+                      aes(x = name, y = log_conserv)) +
+  geom_bar(stat = "identity", width = 0.4, fill = "#BF5700") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12),
+    axis.text.y = element_text(vjust = 0.4, hjust = 0.5, size = 13),
+    axis.title = element_text(size = 14),
+    plot.title = element_text(size = 14)
+  ) +
+  labs(x = expression(italic(B.~subtilis)), y = "log2(in/out)") +
+  scale_y_continuous(breaks = c(2, 0, -2, -4, -6, -8), minor_breaks = NULL, limits = c(-9, 2))
+
+tf_gist_bac
+```
+
+Calculate median conservation across all B, subtilis TFs and for TFs outside the neutral zone
+```{r}
+
+cat("Median log2 conservation across all TFs:", median(log2(tf_conserv_bac$conserv), na.rm = TRUE), "\n")
+
+cat("Median log2 conservation for TFs outside the neutral zone:", tf_conserv_bac %>% filter(zone != "Within neutral zone") %>%
+    summarise(median_conserv = median(log2(conserv), na.rm = TRUE)) %>% pull(median_conserv),"\n")
+```
+
+Collect figures in panel
+```{r}
+
+tf_panel <-
+  (tf_factors_plot_ecoli + tf_factors_bac_all_plot) /
+  (tf_factors_plot_ecoli_mean + tf_factors_bac_plot) /
+  tf_factors_hist_ecoli /
+  tf_gist_bac +
+  plot_layout(
+    heights = c(1, 1, 0.7, 0.5)
+  ) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(size = 22, face = "bold"), plot.margin = margin(5, 8, 5, 8))
+
+ggsave(
+  "figures/tf_factors.jpeg",
+  plot = tf_panel,
+  width = 16,
+  height = 20,
+  units = "in",
+  dpi = 300
+)
+```
+
+
+Polymorphism fractions within E. coli proximal promoter elements and their flanking regions (Figure 2a)
+```{r}
+# Read proximal promoter data and calculate mean polymorphism in flanking regions
+promoter_prox_ecoli <- read.delim("results/E_coli/prox.tsv", row.names = NULL)
+promoter_prox_ecoli <- promoter_prox_ecoli %>% mutate(out_site = (right_site + left_site) / 2)
+
+# Classify points relative to the neutral zone around y = x
+promoter_prox_ecoli <- promoter_prox_ecoli %>%
+  mutate(real_d = (out_site - in_site) / sqrt(2),
+         zone = case_when(
+           real_d >= sd_low & real_d <= sd_up ~ "within neutral zone",
+           real_d > sd_up ~ "above y=x",
+           real_d < sd_low ~ "below y=x"
+         ))
+
+promoter_prox_ecoli %>% count(zone)
+
+# Calculate the boundaries of the neutral zone
+promoter_prox_ecoli <- promoter_prox_ecoli %>%
+  mutate(lower_x = mean_x - sd_low / sqrt(2), lower_y = mean_y + sd_low / sqrt(2),
+         upper_x = mean_x - sd_up / sqrt(2), upper_y = mean_y + sd_up / sqrt(2))
+
+promoter_prox_ecoli_sorted <- promoter_prox_ecoli %>% arrange(mean_x)
+
+polygon_data <- bind_rows(
+  promoter_prox_ecoli_sorted %>% transmute(x = lower_x, y = lower_y),
+  promoter_prox_ecoli_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+# Group promoters by sigma factor
+promoter_prox_ecoli <- promoter_prox_ecoli %>%
+  mutate(sigma_group = case_when(
+    sigmaFactor == "sigma70" ~ "sigma70",
+    sigmaFactor == "sigma28" ~ "sigma28",
+    sigmaFactor == "sigma32" ~ "sigma32",
+    sigmaFactor == "sigma38" ~ "sigma38",
+    TRUE ~ "Other"
+  ))
+
+# Plot polymorphism in proximal promoter elements and their flanks
+prom_prox_ecoli <- ggplot(promoter_prox_ecoli %>% filter(sigma_group != "Other"), aes(in_site, out_site, color = sigma_group)) +
+  geom_jitter(width = 0.005, height = 0.005, alpha = 0.6, size = 1.5) +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  labs(x = "Fraction of polymorphic positions in the proximal element",
+       y = "Fraction of polymorphic positions in flanking regions",
+       color = "Sigma factor", title = expression(italic(E.~coli))) +
+  scale_size_continuous(range = c(1, 8)) +
+  theme_minimal() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065") +
+  scale_color_manual(values = c("sigma70" = "#9b2226", "sigma32" = "#8ecae6", "sigma28" = "orange", "sigma38" = "#984EA3"),
+                     labels = c("sigma70" = expression(sigma^70), "sigma32" = expression(sigma^32),
+                                "sigma28" = expression(sigma^28), "sigma38" = expression(sigma^38))) +
+    theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  aspect.ratio = 1
+)
+
+prom_prox_ecoli
+
+```
+
+Compare polymorphism presence between E. coli proximal element and its flanks (Table 2)
+
+```{r}
+table_2x2 <- with(promoter_prox_ecoli, matrix(
+  c(sum(in_site == 0 & out_site == 0), sum(in_site == 0 & out_site > 0),
+    sum(in_site > 0 & out_site == 0), sum(in_site > 0 & out_site > 0)),
+  nrow = 2, byrow = TRUE,
+  dimnames = list(`Proximal` = c("0", ">0"), `Flanks` = c("0", ">0"))
+))
+table_2x2
+mcnemar.test(table_2x2)
+```
+
+Histogram of the log2 ratio between the polymorphism fraction in E. coli proximal promoter elements and that in their flanking regions for all promoters (Supplementary figure 2a)
+```{r}
+# Calculate the ratio of polymorphism inside and outside proximal elements
+promoter_prox_conserv_ecoli_all <- promoter_prox_ecoli  %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001) %>% mutate(conserv = in_site/out_site)
+promoter_prox_conserv_ecoli_all <- promoter_prox_conserv_ecoli_all[order(promoter_prox_conserv_ecoli_all$conserv),]
+
+promoter_prox_conserv_ecoli_all$pmName <- factor(promoter_prox_conserv_ecoli_all$pmName, levels = promoter_prox_conserv_ecoli_all$pmName)
+# Plot log2 histogram
+promoter_prox_hist_ecoli_all <- ggplot(promoter_prox_conserv_ecoli_all%>% 
+                      mutate(log_conserv = ifelse(conserv == 1, -0.06, log2(conserv))), aes(x = pmName, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4,  fill = "#8C4251") +
+  theme_minimal() + theme(legend.position = "none")+
+  labs(y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 7.5)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1, size = 13)) +
+  theme(axis.title = element_text(size = 13)) +
+  theme(plot.title = element_text(size = 18)) + theme(
+  axis.title.x = element_blank(),
+  axis.text.x = element_blank(),
+  axis.ticks.x = element_blank()
+)
+
+promoter_prox_hist_ecoli_all
+
+```
+
+Histogram of the log2 ratio between the polymorphism fraction in E. coli proximal promoter elements and that in their flanking regions for promoters with non-zero polymorphism in both regions (Supplementary figure 2b)
+
+```{r}
+# Calculate the ratio of polymorphism inside and outside proximal elements
+promoter_prox_conserv_ecoli <- promoter_prox_ecoli %>% filter(in_site >  0 & out_site > 0) %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001) %>% mutate(conserv = in_site/out_site)
+promoter_prox_conserv_ecoli <- promoter_prox_conserv_ecoli[order(promoter_prox_conserv_ecoli$conserv),]
+
+promoter_prox_conserv_ecoli$pmName <- factor(promoter_prox_conserv_ecoli$pmName, levels = promoter_prox_conserv_ecoli$pmName)
+# Plot log2 histogram
+promoter_prox_hist_ecoli <- ggplot(promoter_prox_conserv_ecoli%>% 
+                      mutate(log_conserv = ifelse(conserv == 1, -0.02, log2(conserv))), aes(x = pmName, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4,  fill = "#8C4251") +
+  theme_minimal() + theme(legend.position = "none")+
+  labs(y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 7.5)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust=1, size = 13)) +
+  theme(axis.title = element_text(size = 13)) +
+  theme(plot.title = element_text(size = 18)) +
+  theme(axis.title.x = element_blank())
+
+promoter_prox_hist_ecoli
+```
+
+Calculate median conservation across E. coli proximal promoter elements for promoters with non-zero polymorphism in both regions
+
+```{r}
+median(log2(promoter_prox_conserv_ecoli$conserv))
+```
+
+Polymorphism fractions within E. coli distal elements and their flanking regions (Figure 2b)
+```{r}
+# Read distal promoter data and calculate mean polymorphism in flanking regions
+promoter_dist_ecoli <- read.delim("results/E_coli/dist.tsv", row.names = NULL)
+promoter_dist_ecoli <- promoter_dist_ecoli %>% mutate(out_site = (right_site + left_site) / 2)
+
+promoter_dist_ecoli_id <- promoter_dist_ecoli %>%
+  group_by(pmId) %>%
+  summarise(mean_in_site = first(in_site), mean_out_site = first(out_site))
+
+# Classify points relative to the neutral zone around y = x
+promoter_dist_ecoli <- promoter_dist_ecoli %>%
+  mutate(real_d = (out_site - in_site) / sqrt(2),
+         zone = case_when(
+           real_d >= sd_low & real_d <= sd_up ~ "within neutral zone",
+           real_d > sd_up ~ "above y=x",
+           real_d < sd_low ~ "below y=x"
+         ))
+
+promoter_dist_ecoli %>% count(zone)
+
+# Calculate the boundaries of the neutral zone
+promoter_dist_ecoli <- promoter_dist_ecoli %>%
+  mutate(lower_x = mean_x - sd_low / sqrt(2), lower_y = mean_y + sd_low / sqrt(2),
+         upper_x = mean_x - sd_up / sqrt(2), upper_y = mean_y + sd_up / sqrt(2))
+
+promoter_dist_ecoli_sorted <- promoter_dist_ecoli %>% arrange(mean_x)
+
+polygon_data <- bind_rows(
+  promoter_dist_ecoli_sorted %>% transmute(x = lower_x, y = lower_y),
+  promoter_dist_ecoli_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+# Group promoters by sigma factor
+promoter_dist_ecoli <- promoter_dist_ecoli %>%
+  mutate(sigma_group = case_when(
+    sigmaFactor == "sigma70" ~ "sigma70",
+    sigmaFactor == "sigma28" ~ "sigma28",
+    sigmaFactor == "sigma32" ~ "sigma32",
+    sigmaFactor == "sigma38" ~ "sigma38",
+    TRUE ~ "Other"
+  ))
+
+# Plot polymorphism in distal promoter elements and their flanks
+prom_dist_ecoli <- ggplot(promoter_dist_ecoli %>% filter(sigma_group != "Other"), aes(in_site, out_site, color = sigma_group)) +
+  geom_jitter(width = 0.005, height = 0.005, alpha = 0.6, size = 1.5) +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  labs(x = "Fraction of polymorphic positions in the distal element",
+       y = "Fraction of polymorphic positions in flanking regions",
+       color = "Sigma factor", title = expression(italic(E.~coli))) +
+  scale_size_continuous(range = c(1, 8)) +
+  theme_minimal() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065") +
+  scale_color_manual(values = c("sigma70" = "#645394", "sigma32" = "#8ecae6", "sigma28" = "orange", "sigma38" = "#9b2226"),
+                     labels = c("sigma70" = expression(sigma^70), "sigma32" = expression(sigma^32),
+                                "sigma28" = expression(sigma^28), "sigma38" = expression(sigma^38))) +
+    theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  aspect.ratio = 1
+)
+prom_dist_ecoli
+```
+
+
+Compare polymorphism presence between the distal element and its flanks in E. coli (Table 2)
+
+```{r}
+table_2x2 <- with(promoter_dist_ecoli, matrix(
+  c(sum(in_site == 0 & out_site == 0), sum(in_site == 0 & out_site > 0),
+    sum(in_site > 0 & out_site == 0), sum(in_site > 0 & out_site > 0)),
+  nrow = 2, byrow = TRUE,
+  dimnames = list(`Distal` = c("0", ">0"), `Flanks` = c("0", ">0"))
+))
+table_2x2
+mcnemar.test(table_2x2)
+```
+
+
+Histogram of the log2 ratio between the polymorphism fraction in E. coli distal promoter elements and that in their flanking regions for all promoters (Supplementary figure 2c)
+```{r}
+# Calculate the ratio of polymorphism inside and outside distal elements
+promoter_dist_conserv_ecoli_all <- promoter_dist_ecoli %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001) %>% mutate(conserv = in_site/out_site)
+promoter_dist_conserv_ecoli_all <- promoter_dist_conserv_ecoli_all[order(promoter_dist_conserv_ecoli_all$conserv),]
+
+promoter_dist_conserv_ecoli_all$pmName <- factor(promoter_dist_conserv_ecoli_all$pmName, levels = promoter_dist_conserv_ecoli_all$pmName)
+
+# Plot log2 histogram
+promoter_dist_hist_ecoli_all <- ggplot(promoter_dist_conserv_ecoli_all %>% 
+                      mutate(log_conserv = ifelse(conserv == 1, -0.06, log2(conserv))), aes(x = pmName, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4, fill = "#5F6186") +
+  theme_minimal() + theme(legend.position = "none") +
+  labs(y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7.5)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 13)) +
+  theme(axis.title = element_text(size = 13)) +
+  theme(plot.title = element_text(size = 18))+ theme(
+  axis.title.x = element_blank(),
+  axis.text.x = element_blank(),
+  axis.ticks.x = element_blank()
+)
+
+promoter_dist_hist_ecoli_all
+```
+
+Histogram of the log2 ratio between the polymorphism fraction in distal promoter elements and that in their flanking regions for promoters with non-zero polymorphism in both regions (Supplementary figure 2d)
+
+```{r}
+# Calculate the ratio of polymorphism inside and outside distal elements
+promoter_dist_conserv_ecoli <- promoter_dist_ecoli %>% filter(in_site > 0 & out_site > 0) %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001) %>% mutate(conserv = in_site/out_site)
+promoter_dist_conserv_ecoli <- promoter_dist_conserv_ecoli[order(promoter_dist_conserv_ecoli$conserv),]
+
+promoter_dist_conserv_ecoli$pmName <- factor(promoter_dist_conserv_ecoli$pmName, levels = promoter_dist_conserv_ecoli$pmName)
+
+# Plot log2 histogram
+promoter_dist_hist_ecoli <- ggplot(promoter_dist_conserv_ecoli %>% 
+                      mutate(log_conserv = ifelse(conserv == 1, -0.02, log2(conserv))), aes(x = pmName, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4, fill = "#5F6186") +
+  theme_minimal() + theme(legend.position = "none") +
+  labs(x = expression(italic(E.~coli)), y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 7)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 0.5, size = 13)) +
+  theme(axis.title = element_text(size = 13)) +
+  theme(plot.title = element_text(size = 18))+
+  theme(axis.title.x = element_blank())
+
+promoter_dist_hist_ecoli
+```
+
+Calculate median conservation across E. coli distal promoter elements for promoters with non-zero polymorphism in both regions
+```{r}
+median(log2(promoter_dist_conserv_ecoli$conserv))
+```
+
+Compare polymorphism presence between proximal and distal E. coli promoter elements (Table 2)
+```{r}
+scatter_data <- promoter_dist_ecoli %>%
+  select(pmName, dist_in_site = in_site, dist_out_site = out_site) %>%
+  left_join(promoter_prox_ecoli %>% select(pmName, prox_in_site = in_site, prox_out_site = out_site), by = "pmName")
+
+# Build a contingency table for polymorphism presence in distal and proximal sites
+table_prox_dist <- with(scatter_data, matrix(c(
+  sum(dist_in_site == 0 & prox_in_site == 0, na.rm = TRUE),
+  sum(dist_in_site == 0 & prox_in_site > 0, na.rm = TRUE),
+  sum(dist_in_site > 0 & prox_in_site == 0, na.rm = TRUE),
+  sum(dist_in_site > 0 & prox_in_site > 0, na.rm = TRUE)
+), nrow = 2, byrow = TRUE, dimnames = list(`Distal site` = c("0", ">0"), `Proximal site` = c("0", ">0"))))
+
+table_prox_dist
+
+# McNemar's test
+mcnemar.test(table_prox_dist)
+
+# Chi-squared test
+chisq.test(table_prox_dist)
+
+# Calculate the odds ratio
+OR <- (table_prox_dist[1, 1] * table_prox_dist[2, 2]) / (table_prox_dist[1, 2] * table_prox_dist[2, 1])
+cat("Odds ratio:", OR, "\n")
+```
+
+
+Polymorphism fractions within B. subtilis proximal promoter elements and their flanking regions (Figure 2c)
+```{r}
+promoter_prox_bac <- read.delim("results/B_subtilis/prox.tsv", row.names = NULL)
+promoter_prox_bac <- promoter_prox_bac %>% 
+  mutate(right_site = as.numeric(right_site), left_site = as.numeric(left_site), out_site = (right_site + left_site) / 2)
+
+
+# Group promoters by sigma factor
+promoter_prox_bac <- promoter_prox_bac %>%
+  mutate(sigma_group = case_when(
+    sigmaFactor == "SigA" ~ "SigA",
+    sigmaFactor == "sigB" ~ "SigB",
+    sigmaFactor == "sigD" ~ "SigD",
+    sigmaFactor %in% c("sigM", "sigW", "sigX", "sigY") ~ "SigM, SigW, SigX, SigY",
+    sigmaFactor %in% c("sigE", "sigF", "sigG", "sigK") ~ "SigE, SigF, SigG, SigK",
+    sigmaFactor == "sigH" ~ "SigH",
+    sigmaFactor == "sigL" ~ "SigL",
+    TRUE ~ "Other"
+  ))
+
+# Classify promoters relative to the neutral zone around y = x
+promoter_prox_bac <- promoter_prox_bac %>%
+  mutate(real_d = (out_site - in_site) / sqrt(2), zone = case_when(
+    real_d >= sd_low & real_d <= sd_up ~ "Within neutral zone",
+    real_d > sd_up ~ "Above neutral zone",
+    real_d < sd_low ~ "Below neutral zone"
+  ))
+
+promoter_prox_bac %>%
+  count(zone)
+
+# Calculate the coordinates of the neutral-zone boundaries
+promoter_prox_bac <- promoter_prox_bac %>%
+  mutate(
+    lower_x = mean_x - sd_low / sqrt(2),
+    lower_y = mean_y + sd_low / sqrt(2),
+    upper_x = mean_x - sd_up / sqrt(2),
+    upper_y = mean_y + sd_up / sqrt(2)
+  )
+
+promoter_prox_bac_sorted <- promoter_prox_bac %>%
+  arrange(mean_x)
+
+polygon_data <- bind_rows(
+  promoter_prox_bac_sorted %>% transmute(x = lower_x, y = lower_y),
+  promoter_prox_bac_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+# Plot polymorphism in proximal promoter elements and their flanks
+prom_prox_bac <- ggplot(promoter_prox_bac %>% filter(sigma_group != "Other"), aes(in_site, out_site, color = sigma_group)) +
+  geom_jitter(width = 0.005, height = 0.005, alpha = 0.6, size = 1.5) +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  labs(
+    x = "Fraction of polymorphic positions outside the proximal element",
+    y = "Fraction of polymorphic positions in flanking regions",
+    color = "Sigma factor",
+    title = expression(italic(B.~subtilis))
+  ) +
+  scale_size_continuous(range = c(1, 8)) +
+  theme_minimal() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065") +
+  scale_color_manual(values = c(
+    "SigA" = "#9b2226",
+    "SigB" = "#8ecae6",
+    "SigD" = "orange",
+    "SigM, SigW, SigX, SigY" = "#984EA3",
+    "SigE, SigF, SigG, SigK" = "#0f4c5c",
+    "SigH" = "#F781BF",
+    "SigL" = "#ffd60a"
+  ), labels = list(
+    "SigA" = expression(sigma^A),
+    "SigB" = expression(sigma^B),
+    "SigD" = expression(sigma^D),
+    "SigM, SigW, SigX, SigY" = expression(sigma^M*", "*sigma^W*", "*sigma^X*", "*sigma^Y),
+    "SigE, SigF, SigG, SigK" = expression(sigma^E*", "*sigma^F*", "*sigma^G*", "*sigma^K),
+    "SigH" = expression(sigma^H),
+    "SigL" = expression(sigma^L)
+  )) +
+    theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  aspect.ratio = 1
+)
+prom_prox_bac
+```
+
+Compare polymorphism presence between the proximal B. subtilis element and its flanks (Table 2)
+
+```{r}
+table_2x2 <- with(
+  promoter_prox_bac,
+  matrix(
+    c(sum(in_site == 0 & out_site == 0), sum(in_site == 0 & out_site > 0), sum(in_site > 0 & out_site == 0), sum(in_site > 0 & out_site > 0)),
+    nrow = 2,
+    byrow = TRUE,
+    dimnames = list(`Proximal` = c("0", ">0"), `Flanks` = c("0", ">0"))
+  )
+)
+
+table_2x2
+mcnemar.test(table_2x2)
+```
+
+Histogram of the log2 ratio between the polymorphism fraction in B. subtilis proximal promoter elements and that in their flanking regions for all promoters (Supplementary figure 3a)
+
+```{r}
+# Calculate the ratio of polymorphism inside and outside proximal elements
+promoter_prox_conserv_bac_all <- promoter_prox_bac  %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001, conserv = in_site / out_site) %>%
+  arrange(conserv) %>% distinct(pmName, .keep_all = TRUE) %>% mutate(log_conserv = ifelse(conserv == 1, -0.06, log2(conserv)), pm_id = factor(seq_len(n()), levels = seq_len(n())))
+
+# Plot log2 histogram
+promoter_prox_hist_bac_all <- ggplot(promoter_prox_conserv_bac_all, aes(x = pm_id, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4, fill = "#9b2226") +
+  scale_x_discrete(labels = promoter_prox_conserv_bac_all$pmName) +
+  theme_minimal() + theme(legend.position = "none") +
+  labs(x = expression(italic(B.~subtilis)),  y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 13)) +
+  theme(axis.title = element_text(size = 16)) +
+  theme(plot.title = element_text(size = 18)) + theme(
+  axis.title.x = element_blank(),
+  axis.text.x = element_blank(),
+  axis.ticks.x = element_blank()
+)
+
+promoter_prox_hist_bac_all
+```
+
+
+Histogram of the log2 ratio between the polymorphism fraction in B. subtilis proximal promoter elements and that in their flanking regions for promoters with non-zero polymorphism in both regions (Supplementary figure 3b)
+```{r}
+# Calculate the ratio of polymorphism inside and outside proximal elements
+promoter_prox_conserv_bac <- promoter_prox_bac %>% filter(in_site > 0 & out_site > 0) %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001, conserv = in_site / out_site) %>%
+  arrange(conserv) %>% distinct(pmName, .keep_all = TRUE) %>% mutate(log_conserv = ifelse(conserv == 1, -0.04, log2(conserv)), pm_id = factor(seq_len(n()), levels = seq_len(n())))
+
+# Plot log2 histogram
+promoter_prox_hist_bac <- ggplot(promoter_prox_conserv_bac, aes(x = pm_id, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4, fill = "#9b2226") +
+  scale_x_discrete(labels = promoter_prox_conserv_bac$pmName) +
+  theme_minimal() + theme(legend.position = "none") +
+  labs(x = expression(italic(B.~subtilis)),  y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 13)) +
+  theme(axis.title = element_text(size = 16)) +
+  theme(plot.title = element_text(size = 18)) + theme(
+  axis.title.x = element_blank())
+
+promoter_prox_hist_bac
+
+```
+
+Calculate median conservation across B. subtilis proximal promoter elements for promoters with non-zero polymorphism in both regions
+
+```{r}
+median(log2(promoter_prox_conserv_bac$conserv))
+```
+
+Polymorphism fractions within B. subtilis distal elements and their flanking regions (Figure 2d)
+
+```{r}
+# Read distal promoter data
+promoter_dist_bac <- read.delim("results/B_subtilis/dist.tsv", row.names = NULL)
+
+# Calculate mean polymorphism in the flanking regions
+promoter_dist_bac <- promoter_dist_bac %>%
+  mutate(out_site = (right_site + left_site) / 2)
+
+# Classify promoters relative to the neutral zone around y = x
+promoter_dist_bac <- promoter_dist_bac %>%
+  mutate(
+    real_d = (out_site - in_site) / sqrt(2),
+    zone = case_when(
+      real_d >= sd_low & real_d <= sd_up ~ "Within neutral zone",
+      real_d > sd_up ~ "Above neutral zone",
+      real_d < sd_low ~ "Below neutral zone"
+    )
+  )
+
+promoter_dist_bac %>%
+  count(zone)
+
+# Calculate the coordinates of the neutral-zone boundaries
+promoter_dist_bac <- promoter_dist_bac %>%
+  mutate(
+    lower_x = mean_x - sd_low / sqrt(2),
+    lower_y = mean_y + sd_low / sqrt(2),
+    upper_x = mean_x - sd_up / sqrt(2),
+    upper_y = mean_y + sd_up / sqrt(2)
+  )
+
+promoter_dist_bac_sorted <- promoter_dist_bac %>%
+  arrange(mean_x)
+
+polygon_data <- bind_rows(
+  promoter_dist_bac_sorted %>%
+    transmute(x = lower_x, y = lower_y),
+  promoter_dist_bac_sorted %>%
+    arrange(desc(mean_x)) %>%
+    transmute(x = upper_x, y = upper_y)
+)
+
+# Group promoters by sigma factor
+promoter_dist_bac <- promoter_dist_bac %>%
+  mutate(sigma_group = case_when(
+    sigmaFactor == "SigA" ~ "SigA",
+    sigmaFactor == "sigB" ~ "SigB",
+    sigmaFactor == "sigD" ~ "SigD",
+    sigmaFactor %in% c("sigM", "sigW", "sigX", "sigY") ~ "SigM, SigW, SigX, SigY",
+    sigmaFactor %in% c("sigE", "sigF", "sigG", "sigK") ~ "SigE, SigF, SigG, SigK",
+    sigmaFactor == "sigH" ~ "SigH",
+    sigmaFactor == "sigL" ~ "SigL",
+    TRUE ~ "Other"
+  ))
+
+# Plot polymorphism in distal promoter elements and their flanks
+dist_prom_bac <- ggplot(
+  promoter_dist_bac %>% filter(sigma_group != "Other"),
+  aes(in_site, out_site, color = sigma_group)
+) +
+  geom_jitter(width = 0.005, height = 0.005, alpha = 0.6, size = 1.5) +
+  geom_polygon(
+    data = polygon_data,
+    aes(x = x, y = y),
+    fill = "gray30",
+    alpha = 0.15,
+    inherit.aes = FALSE
+  ) +
+  labs(
+    x = "Fraction of polymorphic positions in the distal element",
+    y = "Fraction of polymorphic positions in flanking regions",
+    color = "Sigma factor",
+    title = expression(italic(B.~subtilis))
+  ) +
+  scale_size_continuous(range = c(1, 8)) +
+  theme_minimal() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065") +
+  scale_color_manual(values = c(
+    "SigA" = "#645394",
+    "SigB" = "#8ecae6",
+    "SigD" = "orange",
+    "SigM, SigW, SigX, SigY" = "#9b2226",
+    "SigE, SigF, SigG, SigK" = "#f2bdcd",
+    "SigH" = "#00693e",
+    "SigL" = "#ffd60a"
+  ), labels = list(
+    "SigA" = expression(sigma^A),
+    "SigB" = expression(sigma^B),
+    "SigD" = expression(sigma^D),
+    "SigM, SigW, SigX, SigY" = expression(sigma^M*", "*sigma^W*", "*sigma^X*", "*sigma^Y),
+    "SigE, SigF, SigG, SigK" = expression(sigma^E*", "*sigma^F*", "*sigma^G*", "*sigma^K),
+    "SigH" = expression(sigma^H),
+    "SigL" = expression(sigma^L)
+  )) +
+    theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+  aspect.ratio = 1
+)
+dist_prom_bac
+
+```
+
+Compare polymorphism presence between the B. subtilis distal element and its flanks (Table 2)
+```{r}
+table_2x2 <- with(
+  promoter_dist_bac,
+  matrix(
+    c(
+      sum(in_site == 0 & out_site == 0),
+      sum(in_site == 0 & out_site > 0),
+      sum(in_site > 0 & out_site == 0),
+      sum(in_site > 0 & out_site > 0)
+    ),
+    nrow = 2,
+    byrow = TRUE,
+    dimnames = list(`Distal` = c("0", ">0"), `Flanks` = c("0", ">0"))
+  )
+)
+table_2x2
+
+mcnemar.test(table_2x2)
+```
+
+Histogram of the log2 ratio between the polymorphism fraction in B. subtilis distal promoter elements and that in their flanking regions for all promoters (Supplementary figure 3c).
+
+```{r}
+
+# Calculate the ratio of polymorphism inside and outside distal elements
+promoter_dist_conserv_bac_all <- promoter_dist_bac  %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001, conserv = in_site / out_site) %>%
+  arrange(conserv) %>% distinct(pmName, .keep_all = TRUE) %>% mutate(log_conserv = ifelse(conserv == 1, -0.06, log2(conserv)), pm_id = factor(seq_len(n()), levels = seq_len(n())))
+
+# Plot log2 histogram
+promoter_dist_hist_bac_all <- ggplot(promoter_dist_conserv_bac_all, aes(x = pm_id, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4, fill = "#645394") +
+  scale_x_discrete(labels = promoter_dist_conserv_bac_all$pmName) +
+  theme_minimal() + theme(legend.position = "none") +
+  labs(x = expression(italic(B.~subtilis)),  y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 13)) +
+  theme(axis.title = element_text(size = 16)) +
+  theme(plot.title = element_text(size = 18)) + theme(
+  axis.title.x = element_blank(),
+  axis.text.x = element_blank(),
+  axis.ticks.x = element_blank()
+)
+
+promoter_dist_hist_bac_all
+```
+
+
+Histogram of the log2 ratio between the polymorphism fraction in B. subtilis distal promoter elements and that in their flanking regions for promoters with non-zero polymorphism in both regions (Supplementary figure 3d).
+```{r}
+# Calculate the ratio of polymorphism inside and outside distal elements
+promoter_dist_conserv_bac <- promoter_dist_bac %>% filter(in_site > 0 & out_site > 0) %>% mutate(out_site = out_site + 0.001, in_site = in_site + 0.001, conserv = in_site / out_site) %>%
+  arrange(conserv) %>% distinct(pmName, .keep_all = TRUE) %>% mutate(log_conserv = ifelse(conserv == 1, -0.04, log2(conserv)), pm_id = factor(seq_len(n()), levels = seq_len(n())))
+
+# Plot log2 histogram
+promoter_dist_hist_bac <- ggplot(promoter_dist_conserv_bac, aes(x = pm_id, y = log_conserv)) +
+  geom_bar(stat = 'identity', width = 0.4, fill = "#645394") +
+  scale_x_discrete(labels = promoter_dist_conserv_bac$pmName) +
+  theme_minimal() + theme(legend.position = "none") +
+  labs(x = expression(italic(B.~subtilis)),  y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 13)) +
+  theme(axis.title = element_text(size = 16)) +
+  theme(plot.title = element_text(size = 18))+ theme(
+  axis.title.x = element_blank()
+)
+
+promoter_dist_hist_bac
+```
+
+Calculate median conservation across B. subtilis distal promoter elements for promoters with non-zero polymorphism in both regions
+```{r}
+median(log2(promoter_dist_conserv_bac$conserv))
+```
+
+Compare polymorphism presence between proximal and distal B. subtilis promoter elements (Table 2)
+```{r}
+# Combine proximal and distal promoter data by promoter ID
+scatter_data <- promoter_dist_bac %>%
+  select(pmId, dist_in_site = in_site, dist_out_site = out_site) %>%
+  left_join(
+    promoter_prox_bac %>% select(pmId, prox_in_site = in_site, prox_out_site = out_site),
+    by = "pmId"
+  )
+
+# Construct a 2x2 table of polymorphism presence in proximal and distal elements
+table_prox_dist <- with(
+  scatter_data,
+  matrix(
+    c(
+      sum(dist_in_site == 0 & prox_in_site == 0, na.rm = TRUE),
+      sum(dist_in_site == 0 & prox_in_site > 0, na.rm = TRUE),
+      sum(dist_in_site > 0 & prox_in_site == 0, na.rm = TRUE),
+      sum(dist_in_site > 0 & prox_in_site > 0, na.rm = TRUE)
+    ),
+    nrow = 2,
+    byrow = TRUE,
+    dimnames = list(
+      `Distal site` = c("0", ">0"),
+      `Proximal site` = c("0", ">0")
+    )
+  )
+)
+
+table_prox_dist
+
+# McNemar's test
+mcnemar.test(table_prox_dist)
+
+# Chi-squared test
+chisq.test(table_prox_dist)
+
+# Calculate the odds ratio
+OR <- (table_prox_dist[1, 1] * table_prox_dist[2, 2]) /
+  (table_prox_dist[1, 2] * table_prox_dist[2, 1])
+
+cat("Odds ratio:", OR, "\n")
+```
+
+Create promoter panel
+```{r}
+prom_panel <-
+  (prom_prox_ecoli + prom_dist_ecoli) /
+  (prom_prox_bac + dist_prom_bac) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(size = 22, face = "bold"))
+
+ggsave(
+  "figures/prom.jpeg",
+  plot = prom_panel,
+  width = 14,
+  height = 12,
+  units = "in",
+  dpi = 300
+)
+```
+
+
+Polymorphism rates across -10 and -35 promoter elements positions in E. coli (Figure 4a, 4c)
+```{r}
+# Polymorphism rates across proximal and distal promoter positions
+prox_coli <- c(0.176, 0.179, 0.128, 0.137, 0.128, 0.119, 0.064, 0.076, 0.076, 0.100, 0.079, 0.058, 0.140, 0.191, 0.207, 0.198, 0.213, 0.210)
+dist_coli <- c(0.159, 0.177, 0.153, 0.187, 0.177, 0.125, 0.104, 0.061, 0.125, 0.119, 0.107, 0.150, 0.135, 0.180, 0.214, 0.199, 0.171, 0.208)
+names(prox_coli) <- 1:18
+names(dist_coli) <- 1:18
+
+# Convert position-wise values to data frames for plotting
+df_prox_coli <- data.frame(index = as.numeric(names(prox_coli)), value = unlist(prox_coli))
+df_dist_coli <- data.frame(index = as.numeric(names(dist_coli)), value = unlist(dist_coli))
+
+# Mark positions belonging to the -10 promoter element
+df_prox_coli$region <- df_prox_coli$index %in% 7:12
+
+# Plot polymorphism across the -10 element
+sig70_prox <- ggplot(df_prox_coli, aes(x = index, y = value)) +
+  geom_col(fill = "#645394", width = 0.8, alpha = 0.85) +
+  geom_col(data = subset(df_prox_coli, region), aes(fill = "element positions"), width = 0.8, alpha = 0.85) +
+  scale_fill_manual(values = c("element positions" = "#8ecae6")) +
+  scale_x_continuous(breaks = df_prox_coli$index) +
+  labs(x = "Position", y = "Fraction of promoters with polymorphism", title = expression("-10 element " * italic(E.~coli)), fill = "") +
+  theme_minimal() + theme(
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12)) +
+  scale_y_continuous(limits = c(0, 0.22))
+
+sig70_prox
+
+
+# Mark positions belonging to the -35 promoter element
+df_dist_coli$region <- df_dist_coli$index %in% 7:12
+
+# Plot polymorphism across the -35 element
+sig70_dist <- ggplot(df_dist_coli, aes(x = index, y = value)) +
+  geom_col(fill = "#645394", width = 0.8, alpha = 0.85) +
+  geom_col(data = subset(df_dist_coli, region), aes(fill = "element positions"), width = 0.8, alpha = 0.85) +
+  scale_fill_manual(values = c("element positions" = "#f2bdcd")) +
+  scale_x_continuous(breaks = df_dist_coli$index) +
+  labs(x = "Position", y = "Fraction of promoters with polymorphism", title = expression("-35 element " * italic(E.~coli)), fill = "") +
+  theme_minimal() + theme(
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12))+
+  scale_y_continuous(limits = c(0, 0.22))
+
+sig70_dist
+
+```
+
+Polymorphism rates across -10 and -35 promoter elements positions in B. subtilis (Figure 4a, 4c)
+
+```{r}
+
+prox_bac <- c(0.044, 0.052, 0.048, 0.064, 0.016, 0.036, 0.004, 0.004, 0.044, 0.04, 0.012, 0.004, 0.068, 0.04, 0.044, 0.06, 0.088, 0.068)
+dist_bac <- c(0.065, 0.044, 0.065, 0.081, 0.052, 0.040, 0, 0.004, 0.024, 0.020, 0.044, 0.044, 0.052, 0.036, 0.097, 0.073, 0.113, 0.109)
+names(prox_bac) <- 1:18
+names(dist_bac) <- 1:18
+
+# Convert the position-wise values to data frames for plotting
+df_prox_bac <- data.frame(
+  index = as.numeric(names(prox_bac)),
+  value = unlist(prox_bac)
+)
+
+df_dist_bac <- data.frame(
+  index = as.numeric(names(dist_bac)),
+  value = unlist(dist_bac)
+)
+
+# Mark positions belonging to the -10 promoter element
+df_prox_bac$region <- df_prox_bac$index %in% 7:12
+
+# Plot polymorphism across the -10 element
+siga_prox <- ggplot(df_prox_bac, aes(x = index, y = value)) +
+  geom_col(fill = "#9b2226", width = 0.8, alpha = 0.85) +
+  geom_col(
+    data = subset(df_prox_bac, region),
+    aes(fill = "element positions"),
+    width = 0.8,
+    alpha = 0.85
+  ) +
+  scale_fill_manual(values = c("element positions" = "#8ecae6")) +
+  scale_x_continuous(breaks = df_prox_bac$index) +
+  labs(
+    x = "Position",
+    y = "Fraction of promoters with polymorphism",
+    title = expression("-10 element " * italic(B.~subtilis)),
+    fill = ""
+  ) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 0.22)) +  theme(
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.position = "none")
+
+siga_prox
+
+
+# Mark positions belonging to the -35 promoter element
+df_dist_bac$region <- df_dist_bac$index %in% 7:12
+
+# Plot polymorphism across the -35 element
+siga_dist <- ggplot(df_dist_bac, aes(x = index, y = value)) +
+  geom_col(fill = "#9b2226", width = 0.8, alpha = 0.85) +
+  geom_col(
+    data = subset(df_dist_bac, region),
+    aes(fill = "element positions"),
+    width = 0.8,
+    alpha = 0.85
+  ) +
+  scale_fill_manual(values = c("element positions" = "#f2bdcd")) +
+  scale_x_continuous(breaks = df_dist_bac$index) +
+  labs(
+    x = "Position",
+    y = "Fraction of promoters with polymorphism",
+    title = expression("-35 element " * italic(B.~subtilis)),
+    fill = ""
+  ) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 0.22)) +  theme(
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    legend.position = "none")
+
+siga_dist
+
+```
+
+Create panel with polymorphisms across promoter position
+
+```{r}
+#Import logo files
+prox_bac_log   <- image_read_svg("prox_bac_logo.svg",   width = 3000)
+dist_bac_log   <- image_read_svg("dist_bac_logo.svg",   width = 3000)
+prox_ecoli_log <- image_read_svg("prox_ecoli_logo.svg", width = 3000)
+dist_ecoli_log <- image_read_svg("dist_ecoli_logo.svg", width = 3000)
+
+
+trim_logo <- function(img) image_trim(img, fuzz = 10)
+
+logo_cell <- function(img, x = 0.09, width = 0.88, dy = 0) {
+  wrap_elements(full = rasterGrob(
+    as.raster(trim_logo(img)),
+    x = unit(x, "npc"),
+    y = unit(1, "npc") + unit(dy, "mm"),   
+    width = unit(width, "npc"),            
+    just = c("left", "top"),
+    interpolate = TRUE
+  ))
+}
+
+prox_ecoli_logo <- logo_cell(prox_ecoli_log, x = 0.067, width = 0.64, dy = 0)
+prox_bac_logo   <- logo_cell(prox_bac_log,   x = 0.093, width = 0.87, dy = 0)
+dist_ecoli_logo <- logo_cell(dist_ecoli_log, x = 0.067, width = 0.64, dy = 0)
+dist_bac_logo   <- logo_cell(dist_bac_log,   x = 0.093, width = 0.85, dy = 0)
+
+
+design <- "
+AB
+CD
+EF
+GH
+"
+
+prom_pos_panel <-
+  sig70_prox + siga_prox + prox_ecoli_logo + prox_bac_logo +
+  sig70_dist + siga_dist + dist_ecoli_logo + dist_bac_logo +
+  plot_layout(design = design, heights = c(1.5, 0.7, 1.5, 0.7)) +
+  plot_annotation(tag_levels = list(c("a", "b", "", "", "c", "d", "", ""))) &
+  theme(plot.tag = element_text(size = 22, face = "bold"))
+
+ggsave("figures/prom_pos.jpeg", prom_pos_panel, width = 13, height = 13, units = "in", dpi = 300)
+```
+
+
+Polymorphism fractions within E. coli non-coding RNAs and their flanking regions (Figure 3a)
+```{r}
+# Read RNA polymorphism data and calculate the mean polymorphism in flanking regions
+dif_rna_ecoli <- read.delim("results/E_coli/rna.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE)
+dif_rna_ecoli <- dif_rna_ecoli %>% mutate(out_site = (right_site + left_site) / 2) 
+
+# Add analyses using only the left or right flank
+dif_rna_ecoli_right <- read.delim("results/E_coli/rna_right.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE)
+dif_rna_ecoli_left <- read.delim("results/E_coli/rna_left.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE)
+
+dif_rna_ecoli <- bind_rows(dif_rna_ecoli_right, dif_rna_ecoli_left, dif_rna_ecoli %>% select(-left_site, -right_site))
+
+# Classify points relative to the neutral zone around y = x
+dif_rna_ecoli <- dif_rna_ecoli %>%
+  mutate(real_d = (out_site - in_site) / sqrt(2),
+         zone = case_when(
+           real_d >= sd_low & real_d <= sd_up ~ "within neutral zone",
+           real_d > sd_up ~ "above y=x",
+           real_d < sd_low ~ "below y=x"
+         ))
+
+dif_rna_ecoli %>% count(zone)
+
+# Calculate the coordinates of the neutral-zone boundaries
+dif_rna_ecoli <- dif_rna_ecoli %>%
+  mutate(lower_x = mean_x - sd_low / sqrt(2),
+         lower_y = mean_y + sd_low / sqrt(2),
+         upper_x = mean_x - sd_up / sqrt(2),
+         upper_y = mean_y + sd_up / sqrt(2))
+
+dif_rna_ecoli_sorted <- dif_rna_ecoli %>% arrange(mean_x)
+
+
+polygon_data <- bind_rows(
+  dif_rna_ecoli_sorted %>% transmute(x = lower_x, y = lower_y),
+  dif_rna_ecoli_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+
+max_val <- max(dif_rna_ecoli$in_site, dif_rna_ecoli$out_site, polygon_data$x, polygon_data$y, na.rm = TRUE)
+dif_rna_ecoli <- dif_rna_ecoli %>%
+  mutate(point_shape = ifelse(grepl("gene", class, ignore.case = TRUE),
+                              "small RNA gene", "regulatory RNA element"))
+# Plot polymorphism inside and outside non-coding RNAs
+rna_plot_ecoli <- ggplot(dif_rna_ecoli, aes(x = in_site, y = out_site,
+                                            shape = point_shape)) +
+  geom_polygon(data = polygon_data, aes(x = x, y = y),
+               fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  geom_point(color = '#70ae6e', size = 2) +
+  labs(x = "Fraction of polymorphic positions in the non-coding RNA",
+       y = "Fraction of polymorphic positions in flanking regions",
+       title = expression(italic(E.~coli))) +
+  theme_minimal() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065") +
+  scale_x_continuous(limits = c(0, max_val)) +
+  scale_y_continuous(limits = c(0, max_val)) +
+  scale_shape_manual(values = c("small RNA gene" = 17,
+                                "regulatory RNA element" = 16),
+                     name = "Class") +
+  guides(shape = guide_legend(
+    override.aes = list(color = "gray50", size = 3)
+  )) +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "right",
+    aspect.ratio = 1
+  )
+
+rna_plot_ecoli
+
+```
+
+Test the proportion of E. coli RNAs above the neutral zone
+```{r}
+res <- binom.test(
+  x = 14,
+  n = 18,
+  p = 0.5,
+  alternative = "two.sided"
+)
+
+cat("Proportion:", round(14 / 18 * 100, 1), "%\n")
+cat("P-value:", res$p.value, "\n")
+```
+
+Histograms of the log2 ratio between the mean polymorphism fraction within E. coli non-coding RNAs and their flanking regions (Figure 3c)
+
+```{r}
+# Calculate mean polymorphism across occurences of each RNA
+dif_rna_ecoli_name <- dif_rna_ecoli %>%
+  group_by(regulatorName) %>%
+  summarise(mean_in_site = mean(in_site), mean_out_site = mean(out_site))
+
+# Calculate within-RNA to outside-RNA polymorphism ratios
+rna_conserv_ecoli <- dif_rna_ecoli_name %>% mutate(out_site = mean_out_site + 0.001, in_site = mean_in_site + 0.001)
+rna_conserv_ecoli <- rna_conserv_ecoli %>% mutate(conserv = in_site / out_site)
+
+rna_conserv_ecoli <- rna_conserv_ecoli[order(rna_conserv_ecoli$conserv), ]
+rna_conserv_ecoli$regulatorName <- factor(rna_conserv_ecoli$regulatorName, levels = rna_conserv_ecoli$regulatorName)
+
+# Plot log2 within-RNA to outside-RNA polymorphism ratios
+rna_ecoli_hist <- ggplot(rna_conserv_ecoli %>% mutate(log_conserv = ifelse(conserv == 1, -0.04, log2(conserv))),
+                         aes(x = regulatorName, y = log_conserv)) +
+  geom_bar(stat = "identity", width = 0.4, fill = "#70ae6e") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x = expression(italic(E.~coli)), y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12),
+        axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 13),
+        axis.title = element_text(size = 14),
+        plot.title = element_text(size = 14)) +
+  scale_y_continuous(breaks = c(6, 4, 2, 0, -2, -4), minor_breaks = NULL, limits = c(-4, 6))
+
+rna_ecoli_hist
+
+```
+
+Calculate median conservation across E. coli RNAs
+```{r}
+cat("Median log2 conservation:", median(log2(rna_conserv_ecoli$conserv), na.rm = TRUE), "\n")
+```
+
+Compare polymorphism between paired and unpaired E. coli RNA positions
+```{r}
+# Read RNA structure polymorphism data
+dif_rna_one <- read.delim("results/E_coli/rna_structure.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE)
+dif_rna_one <- dif_rna_one %>% filter(size > 100)
+
+# Statistical analysis
+test <- suppressWarnings(
+  wilcox.test(dif_rna_one$paired, dif_rna_one$unpaired, paired = TRUE, alternative = "two.sided")
+)
+test
+
+median_difference <- median(dif_rna_one$paired - dif_rna_one$unpaired, na.rm = TRUE)
+cat("Median difference (paired - unpaired):", median_difference, "\n")
+
+```
+
+Polymorphism fractions within B. subtilis non-coding RNAs and their flanking regions (Figure 3b)
+```{r}
+# Read Rfam RNA polymorphism data
+dif_rna_bac <- read.delim("results/B_subtilis/rna.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE) %>%
+  mutate(out_site = (right_site + left_site) / 2) 
+
+dif_rna_bac_right <- read.delim("results/B_subtilis/rna_right.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE)
+dif_rna_bac_left <- read.delim("results/B_subtilis/rna_left.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE)
+
+# Combine analyses of both flanks and individual flanks
+dif_rna_bac <- bind_rows(
+  dif_rna_bac_right,
+  dif_rna_bac_left,
+  dif_rna_bac %>% select(-left_site, -right_site)
+)
+
+# Classify RNAs relative to the neutral zone around y = x
+dif_rna_bac <- dif_rna_bac %>%
+  mutate(
+    real_d = (out_site - in_site) / sqrt(2),
+    zone = case_when(
+      real_d >= sd_low & real_d <= sd_up ~ "Within neutral zone",
+      real_d > sd_up ~ "Above neutral zone",
+      real_d < sd_low ~ "Below neutral zone"
+    )
+  )
+
+dif_rna_bac %>% count(zone)
+
+
+# Calculate the coordinates of the neutral-zone boundaries
+dif_rna_bac <- dif_rna_bac %>%
+  mutate(
+    lower_x = mean_x - sd_low / sqrt(2),
+    lower_y = mean_y + sd_low / sqrt(2),
+    upper_x = mean_x - sd_up / sqrt(2),
+    upper_y = mean_y + sd_up / sqrt(2)
+  )
+
+dif_rna_bac_sorted <- dif_rna_bac %>% arrange(mean_x)
+
+polygon_data <- bind_rows(
+  dif_rna_bac_sorted %>% transmute(x = lower_x, y = lower_y),
+  dif_rna_bac_sorted %>% arrange(desc(mean_x)) %>% transmute(x = upper_x, y = upper_y)
+)
+dif_rna_bac <- dif_rna_bac %>%
+  mutate(point_shape = ifelse(grepl("gene", class, ignore.case = TRUE),
+                              "small RNA gene", "regulatory RNA element"))
+
+# Plot polymorphism in non-coding RNAs and their flanks
+rna_plot_bac <- ggplot(dif_rna_bac, aes(x = in_site, y = out_site, shape = point_shape)) +
+  geom_polygon(data = polygon_data, aes(x = x, y = y), fill = "gray30", alpha = 0.15, inherit.aes = FALSE) +
+  geom_point(color = "#4D6593", size = 2) +
+  labs(
+    x = "Fraction of polymorphic positions in the non-coding RNA",
+    y = "Fraction of polymorphic positions in flanking regions",
+    title = expression(italic(B.~subtilis))
+  ) +
+  theme_minimal() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "#006065") +
+  scale_x_continuous(limits = c(0, NA)) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_shape_manual(values = c("small RNA gene" = 17, "regulatory RNA element" = 16),
+                     name = "Class")+
+    theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 11),
+    legend.position = "none",
+  aspect.ratio = 1
+)
+
+rna_plot_bac
+```
+
+Test the proportion of B. subtilis RNAs above the neutral zone
+```{r}
+res <- binom.test(
+  x = 8,
+  n = 9,
+  p = 0.5,
+  alternative = "two.sided"
+)
+
+cat("Proportion:", round(13 / 17 * 100, 1), "%\n")
+cat("P-value:", res$p.value, "\n")
+```
+
+Histograms of the log2 ratio between the mean polymorphism fraction within B. subtilis non-coding RNAs and their flanking regions (Figure 3d)
+
+```{r}
+# Calculate mean polymorphism across occurences of each RNA
+dif_rna_name_bac <- dif_rna_bac %>%
+  group_by(regulatorName) %>%
+  summarise(mean_in_site = mean(in_site), mean_out_site = mean(out_site), class = first(class))
+
+
+# Calculate within-RNA to outside-RNA polymorphism ratios
+rna_conserv_bac <- dif_rna_name_bac %>% mutate(out_site = mean_out_site + 0.001, in_site = mean_in_site + 0.001)
+rna_conserv_bac <- rna_conserv_bac %>% mutate(conserv = in_site / out_site)
+
+rna_conserv_bac <- rna_conserv_bac[order(rna_conserv_bac$conserv), ]
+rna_conserv_bac$regulatorName <- factor(rna_conserv_bac$regulatorName, levels = rna_conserv_bac$regulatorName)
+
+
+# Plot log2 within-RNA to outside-RNA polymorphism ratios
+rna_gist_bac <- ggplot(
+  rna_conserv_bac %>% mutate(log_conserv = ifelse(conserv == 1, -0.04, log2(conserv))),
+  aes(x = regulatorName, y = log_conserv)
+) +
+  geom_bar(stat = "identity", width = 0.4, fill = "#4D6593") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x = expression(italic(B.~subtilis)), y = "log2(in/out)") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 12)) +
+  theme(axis.text.y = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 13)) +
+  theme(axis.title = element_text(size = 14)) +
+  theme(plot.title = element_text(size = 14)) +
+  scale_y_continuous(
+    breaks = c(6, 4, 2, 0, -2, -4, -6),
+    minor_breaks = NULL,
+    limits = c(-6, 6)
+  )
+
+rna_gist_bac
+
+```
+
+Calculate median conservation across B. subtilis RNAs
+```{r}
+cat("Median log2 conservation:", median(log2(rna_conserv_bac$conserv), na.rm = TRUE), "\n")
+```
+
+Create RNA panel
+
+```{r}
+rna_panel <-
+  (rna_plot_ecoli + rna_plot_bac)/ rna_ecoli_hist / rna_gist_bac +
+  plot_layout(
+    heights = c(1, 0.35, 0.35)      
+  ) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(size = 18, face = "bold"))
+
+ggsave(
+  "figures/rna.jpeg",
+  plot = rna_panel,
+  width = 14,
+  height = 19,
+  units = "in",
+  dpi = 300
+)
+```
+
+
+Compare polymorphism between B. subtilis paired and unpaired RNA positions
+```{r}
+# Read RNA structure polymorphism data
+dif_rna_one <- read.delim("results/B_subtilis/rnas_structure.tsv", header = TRUE, sep = "\t", row.names = NULL, check.names = FALSE)
+dif_rna_one <- dif_rna_one %>% filter(size > 100)
+
+# Statistical analysis
+test <- suppressWarnings(
+  wilcox.test(dif_rna_one$paired, dif_rna_one$unpaired, paired = TRUE, alternative = "two.sided")
+)
+test
+
+median_difference <- median(dif_rna_one$paired - dif_rna_one$unpaired, na.rm = TRUE)
+cat("Median difference (paired - unpaired):", median_difference, "\n")
+
+```
+
+Plot polymorphism in paired and unpaired B. subtilis RNA positions (Figure 5a)
+```{r}
+# Reshape the data for the boxplot
+df_long_rna <- dif_rna_one %>%
+  pivot_longer(cols = c(paired, unpaired), names_to = "structure", values_to = "polymorphism_rate")
+
+# Plot polymorphism in paired and unpaired RNA positions
+dif_rna_boxplot <-  ggplot(df_long_rna, aes(x = structure, y = polymorphism_rate, fill = structure)) +
+    geom_boxplot(alpha = 0.5, outlier.shape = NA) +
+    geom_jitter(aes(color = structure), width = 0.2, size = 2, alpha = 0.6) +
+    scale_x_discrete(labels = c("paired" = "Paired positions", "unpaired" = "Unpaired positions")) +
+    scale_fill_manual(values = c("paired" = "#6C9EC9", "unpaired" = "#52BBAD")) +
+    scale_color_manual(values = c("paired" = "#6C9EC9", "unpaired" = "#52BBAD")) +
+    labs(x = "", y = "Fraction of polymorphic positions in RNA") +
+    theme_minimal() +
+    theme(legend.position = "none", axis.text.x = element_text(size = 10)) +
+    stat_compare_means(
+      comparisons = list(c("paired", "unpaired")),
+      paired = TRUE,
+      method = "wilcox.test",
+      method.args = list(exact = FALSE),
+      label = "p.format"
+    )
+
+dif_rna_boxplot
+```
+
+
+Compare polymorphism between B. subtilis terminator structures
+```{r}
+term_bac <- read.delim("results/B_subtilis/term_structure.tsv", row.names = NULL) %>%
+  mutate(paired_hairpin = paired_hairpin / 2)
+
+# Compare polymorphism rates between terminator structures
+friedman.test(as.matrix(term_bac[, c("in_tail", "paired_hairpin", "loop")]))
+
+pvals <- c(
+  "tail vs paired hairpin" = wilcox.test(term_bac$in_tail, term_bac$paired_hairpin, paired = TRUE)$p.value,
+  "tail vs loop" = wilcox.test(term_bac$in_tail, term_bac$loop, paired = TRUE)$p.value,
+  "paired hairpin vs loop" = wilcox.test(term_bac$paired_hairpin, term_bac$loop, paired = TRUE)$p.value
+)
+
+p_adj <- p.adjust(pvals, method = "holm")
+cat("Holm-adjusted pairwise Wilcoxon p-values:\n")
+print(p_adj)
+```
+
+Plot polymorphism rates across B. subtilis terminator structures (Figure 5b)
+
+```{r}
+term_long <- term_bac %>%
+  pivot_longer(cols = c(in_tail, paired_hairpin, loop), names_to = "structure", values_to = "polymorphism_rate")
+
+term_long_nonzero <- term_long %>% filter(polymorphism_rate > 0)
+term_long_zero <- term_long %>% filter(polymorphism_rate == 0)
+
+# Prepare adjusted p-values for pairwise comparisons
+stat.test <- data.frame(
+  group1 = c("in_tail", "in_tail", "paired_hairpin"),
+  group2 = c("paired_hairpin", "loop", "loop"),
+  p.adj = p_adj,
+  y.position = c(1.3, 1.2, 1.2)
+) %>%
+  mutate(label = formatC(p.adj, format = "e", digits = 2))
+
+# Plot polymorphism rates across terminator structures
+term_box <- ggplot() +
+  geom_boxplot(data = term_long, aes(x = structure, y = polymorphism_rate, fill = structure),
+               alpha = 0.5, outlier.shape = NA, width = 0.7, show.legend = FALSE) +
+  geom_jitter(data = term_long_nonzero, aes(x = structure, y = polymorphism_rate, color = structure),
+              size = 2, alpha = 0.6, width = 0.2, height = 0, show.legend = FALSE) +
+  geom_jitter(data = term_long_zero, aes(x = structure, y = polymorphism_rate, color = structure),
+              size = 2, alpha = 0.6, width = 0.2, height = 0.005, show.legend = FALSE) +
+  scale_x_discrete(labels = c("in_tail" = "Poly-U tail", "loop" = "Loop", "paired_hairpin" = "Stem")) +
+  scale_fill_manual(values = c("in_tail" = "#d5573b", "paired_hairpin" = "#70ae6e", "loop" = "#777da7")) +
+  scale_color_manual(values = c("in_tail" = "#d5573b", "paired_hairpin" = "#70ae6e", "loop" = "#777da7")) +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 14), axis.text.x = element_text(size = 10)) +
+  labs(x = " ", y = "Fraction of polymorphic positions in terminator") +
+  stat_pvalue_manual(stat.test, label = "label", xmin = "group1", xmax = "group2",
+                     y.position = "y.position", tip.length = 0.01)
+
+term_box
+
+```
+
+Creat rna and terminator structure panel
+```{r}
+rna_term_panel <-
+  (dif_rna_boxplot + term_box) + plot_layout(widths = c(1, 1.4)) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(size = 18, face = "bold"))
+
+ggsave(
+  "rna_term.jpeg",
+  plot = rna_term_panel,
+  width = 11,
+  height = 5,
+  units = "in",
+  dpi = 300
+)
+```
+
+Change polymorphism threshold
+```{r}
+make_tf_plot <- function(polymorphism_threshold) {
+
+  input_file <- paste0("results/E_coli/tf_", polymorphism_threshold, ".tsv")
+
+  tf_factors_ecoli <- read.delim(input_file, row.names = NULL) %>%
+    mutate(out_site = (right_site + left_site) / 2) %>%
+    filter(confidenceLevel != "W") %>%
+    mutate(
+      real_d = (out_site - in_site) / sqrt(2),
+      zone = case_when(
+        real_d >= sd_low & real_d <= sd_up ~ "within neutral zone",
+        real_d > sd_up ~ "above y=x",
+        real_d < sd_low ~ "below y=x"
+      ),
+      color_group = ifelse(
+        regulatorName %in% c("ArcA", "CRP", "Fis", "Fur", "H-NS", "Lrp", "Nac"),
+        regulatorName,
+        "Other"
+      ),
+      lower_x = mean_x - sd_low / sqrt(2),
+      lower_y = mean_y + sd_low / sqrt(2),
+      upper_x = mean_x - sd_up / sqrt(2),
+      upper_y = mean_y + sd_up / sqrt(2)
+    )
+      # Binomial test: points above vs below the neutral zone
+    zone_counts <- tf_factors_ecoli %>%
+      filter(zone != "within neutral zone") %>%
+      count(zone)
+  
+    n_above <- sum(zone_counts$n[zone_counts$zone == "above y=x"])
+    n_below <- sum(zone_counts$n[zone_counts$zone == "below y=x"])
+    n_outside <- n_above + n_below
+  
+    if (n_outside > 0) {
+      res <- binom.test(
+        x = n_above,
+        n = n_outside,
+        p = 0.5,
+        alternative = "two.sided"
+      )
+
+    cat("\nThreshold:", polymorphism_threshold, "\n")
+    cat("Points above:", n_above, "\n")
+    cat("Points below:", n_below, "\n")
+    cat("Proportion above:", round(n_above / n_outside * 100, 1), "%\n")
+    cat("P-value:", res$p.value, "\n")
+  }
+  tf_factors_ecoli_sorted <- tf_factors_ecoli %>%
+    arrange(mean_x)
+
+  polygon_data <- bind_rows(
+    tf_factors_ecoli_sorted %>%
+      transmute(x = lower_x, y = lower_y),
+    tf_factors_ecoli_sorted %>%
+      arrange(desc(mean_x)) %>%
+      transmute(x = upper_x, y = upper_y)
+  )
+
+  tf_factors_plot_ecoli <- ggplot() +
+    geom_polygon(
+      data = polygon_data,
+      aes(x = x, y = y),
+      fill = "gray30",
+      alpha = 0.15,
+      inherit.aes = FALSE
+    ) +
+    geom_jitter(
+      data = tf_factors_ecoli,
+      aes(x = in_site, y = out_site, color = color_group),
+      width = 0.0005,
+      height = 0.0005,
+      alpha = 0.8,
+      size = 1.5
+    ) +
+    geom_abline(
+      intercept = 0,
+      slope = 1,
+      linetype = "dashed",
+      color = "#006065",
+      linewidth = 1
+    ) +
+    labs(
+      x = "Fraction of polymorphic positions in the TF site",
+      y = "Fraction of polymorphic positions in flanking regions",
+      title = bquote(.(polymorphism_threshold))
+    ) +
+    scale_color_manual(
+      name = "TF",
+      values = c(
+        "ArcA" = "#3498db",
+        "CRP" = "#38b000",
+        "Fis" = "darkblue",
+        "Fur" = "red",
+        "H-NS" = "#393a41",
+        "Lrp" = "#ac11ff",
+        "Nac" = "#f15bb5",
+        "Other" = "orange"
+      ),
+      breaks = c(
+        "ArcA", "CRP", "Fis", "Fur",
+        "H-NS", "Lrp", "Nac", "Other"
+      )
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14),
+      axis.text = element_text(size = 12),
+      axis.title = element_text(size = 13),
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 11),
+      legend.position = "right",
+      plot.margin = margin(5, 5, 5, 5),
+      aspect.ratio = 1
+    )
+
+  return(tf_factors_plot_ecoli)
+}
+
+tf_plot_1 <- make_tf_plot(1)
+tf_plot_2 <- make_tf_plot(5)
+tf_plot_3 <- make_tf_plot(10)
+tf_plot_4 <- make_tf_plot(100)
+
+```
+
+
+Make panel with different threshold (Supplementary figure 1)
+```{r}
+tf_threshold <-
+  (tf_plot_1 + tf_plot_2) /
+  (tf_plot_3 + tf_plot_4) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(size = 22, face = "bold"))
+
+ggsave(
+  "figures/tf_treshold.jpeg",
+  plot = tf_threshold,
+  width = 14,
+  height = 12,
+  units = "in",
+  dpi = 300
+)
+```
+
+Promoter E. coli histogram
+```{r}
+prom_ecoli_hist <-
+  promoter_prox_hist_ecoli_all / promoter_prox_hist_ecoli / promoter_dist_hist_ecoli_all / promoter_dist_hist_ecoli +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(size = 22, face = "bold"))
+
+ggsave(
+  "figures/prom_ecoli_hist.jpeg",
+  plot = prom_ecoli_hist,
+  width = 14,
+  height = 14,
+  units = "in",
+  dpi = 300
+)
+```
+
+Promoter B. subtilis histogram
+```{r}
+prom_bac_hist <-
+  promoter_prox_hist_bac_all / promoter_prox_hist_bac/ promoter_dist_hist_bac_all / promoter_dist_hist_bac +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(size = 22, face = "bold"))
+
+ggsave(
+  "figures/prom_bac_hist.jpeg",
+  plot = prom_bac_hist,
+  width = 14,
+  height = 16,
+  units = "in",
+  dpi = 300
+)
+```
