@@ -1,0 +1,14 @@
+- `dist.tsv` — polymorphism rates in distal promoter elements and their flanking regions
+- `prox.tsv` — polymorphism rates in proximal promoter elements and their flanking regions
+- `rna.tsv` — polymorphism rates in RNA elements and their flanking regions
+- `rna_left.tsv` — polymorphism rates in RNA elements and their left flanking region
+- `rna_right.tsv` — polymorphism rates in RNA elements and their right flanking region
+- `rnas_structure.tsv` — polymorphism rates at paired and unpaired positions in RNA
+- `term.tsv` — polymorphism rates in terminators and their flanking regions
+- `term_right.tsv` — polymorphism rates in terminators and their right flanking region.
+- `tf_1.tsv` — polymorphism rates in TFBSs and their flanking regions, using a minimum occurrence threshold of 1
+- `tf_5.tsv` — polymorphism rates in TFBSs and their flanking regions, using a minimum occurrence threshold of 5
+- `tf_10.tsv` — polymorphism rates in TFBSs and their flanking regions, using a minimum occurrence threshold of 10
+- `tf_100.tsv` — polymorphism rates in TFBSs and their flanking regions, using a minimum occurrence threshold of 100
+- `tf_mean.tsv` — mean polymorphism rates across binding sites and flanking regions for each transcription factor
+- `rna_stat.txt` —  nucleotide substitutions at complementary base pairs in RNA secondary structures
