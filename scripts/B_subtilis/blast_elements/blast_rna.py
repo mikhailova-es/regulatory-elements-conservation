@@ -18,7 +18,11 @@ blast_path = 'path_to_blast'
 folder_paths = [sin_minus_dir, sin_plus_dir, divergent_dir, convergent_dir]
 
 for folder_path in folder_paths:
-
+    os.makedirs( '/rnas_alignments/', exist_ok=True)
+    os.makedirs( '/rnas_alignments/without_flanks', exist_ok=True)
+    os.makedirs( '/rnas_alignments/both_flanks', exist_ok=True)
+    os.makedirs( '/rnas_alignments/right_flank', exist_ok=True)
+    os.makedirs( '/rnas_alignments/left_flank', exist_ok=True)
     for filename in os.listdir(folder_path):
         if filename[-3:] == 'fna':
 
