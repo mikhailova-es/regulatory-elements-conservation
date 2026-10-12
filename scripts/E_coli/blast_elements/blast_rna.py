@@ -20,11 +20,11 @@ def filter_blast_results(blast_record):
 
 
 for folder_path in folder_paths:
-    os.makedirs( folder_path + '/rnas_alignments/', exist_ok=True)
-    os.makedirs( folder_path + '/rnas_alignments/without_flanks', exist_ok=True)
-    os.makedirs( folder_path + '/rnas_alignments/both_flanks', exist_ok=True)
-    os.makedirs( folder_path + '/rnas_alignments/right_flank', exist_ok=True)
-    os.makedirs( folder_path + '/rnas_alignments/left_flank', exist_ok=True)
+    os.makedirs(folder_path + '/rnas_alignments/', exist_ok=True)
+    os.makedirs(folder_path + '/rnas_alignments/without_flanks', exist_ok=True)
+    os.makedirs(folder_path + '/rnas_alignments/both_flanks', exist_ok=True)
+    os.makedirs(folder_path + '/rnas_alignments/right_flank', exist_ok=True)
+    os.makedirs(folder_path + '/rnas_alignments/left_flank', exist_ok=True)
     for filename in os.listdir(folder_path):
         if filename[-3:] == 'fna':
 
